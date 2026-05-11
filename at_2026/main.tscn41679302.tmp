@@ -1,0 +1,47 @@
+[gd_scene load_steps=10 format=3 uid="uid://0ax48ads5r1d"]
+
+[ext_resource type="PackedScene" uid="uid://bh11spqnavb3m" path="res://circle.tscn" id="1_ig7tw"]
+[ext_resource type="AudioStream" uid="uid://b8o8j1p7t5b41" path="res://asset/C.mp3" id="2_0xm2m"]
+[ext_resource type="Script" uid="uid://e87pu0bllylc" path="res://sound.gd" id="2_lquwl"]
+[ext_resource type="AudioStream" uid="uid://bs28rpj1k43hq" path="res://asset/D.mp3" id="4_7mycd"]
+[ext_resource type="AudioStream" uid="uid://csdk3d7g84758" path="res://asset/E.mp3" id="5_272bh"]
+[ext_resource type="AudioStream" uid="uid://bplitoygqb0ce" path="res://asset/F.mp3" id="6_kek77"]
+[ext_resource type="AudioStream" uid="uid://b80lsfm4rxmuv" path="res://asset/G.mp3" id="7_4c57u"]
+[ext_resource type="AudioStream" uid="uid://c8p7eq7wu4vet" path="res://asset/A.mp3" id="8_efxa6"]
+[ext_resource type="AudioStream" uid="uid://ce4ueiphyqn0c" path="res://asset/B.mp3" id="9_dg77c"]
+
+[node name="main" type="Node"]
+
+[node name="ColorRect" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="circle" parent="." instance=ExtResource("1_ig7tw")]
+
+[node name="Sound" type="Node" parent="."]
+script = ExtResource("2_lquwl")
+
+[node name="audio_C" type="AudioStreamPlayer" parent="Sound"]
+stream = ExtResource("2_0xm2m")
+
+[node name="audio_D" type="AudioStreamPlayer" parent="Sound"]
+stream = ExtResource("4_7mycd")
+
+[node name="audio_E" type="AudioStreamPlayer" parent="Sound"]
+stream = ExtResource("5_272bh")
+
+[node name="audio_F" type="AudioStreamPlayer" parent="Sound"]
+stream = ExtResource("6_kek77")
+
+[node name="audio_G" type="AudioStreamPlayer" parent="Sound"]
+stream = ExtResource("7_4c57u")
+
+[node name="audio_A" type="AudioStreamPlayer" parent="Sound"]
+stream = ExtResource("8_efxa6")
+
+[node name="audio_B" type="AudioStreamPlayer" parent="Sound"]
+stream = ExtResource("9_dg77c")
