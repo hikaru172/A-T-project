@@ -1,13 +1,13 @@
-#define NUM_SENSORS 5
-#define THRESHOLD 30
+#define NUM_SENSORS 3
+#define THRESHOLD 70
 #define COOLDOWN 200
 
-const int trigPins[NUM_SENSORS] = {3, 5, 7, 9, 11};
-const int echoPins[NUM_SENSORS] = {2, 4, 6, 8, 10};
-const String notes[NUM_SENSORS] = {"DO", "RE", "MI", "FA", "SO"};
+const int trigPins[NUM_SENSORS] = {3,7,11};
+const int echoPins[NUM_SENSORS] = {2,6,10};
+const String notes[NUM_SENSORS] = {"C4", "D4", "E4"};
 
-bool wasTriggered[NUM_SENSORS] = {false, false, false, false, false};
-unsigned long lastTriggered[NUM_SENSORS] = {0, 0, 0, 0, 0};
+bool wasTriggered[NUM_SENSORS] = {false, false, false};
+unsigned long lastTriggered[NUM_SENSORS] = {0, 0, 0};
 
 void setup() {
   Serial.begin(2000000);
@@ -32,23 +32,29 @@ void loop() {
   for (int i = 0; i < NUM_SENSORS; i++) {
     unsigned long start = millis();
     double dist = getDistance(i);
+    // double dist = getDistance(0);
     unsigned long elapsed = millis() - start;
 
     // 距離と遅延時間をシリアルモニターに表示
-    Serial.print("sensor");
-    Serial.print(i + 1);
-    Serial.print(" dist:");
-    Serial.print(dist);
-    Serial.print("cm  delay:");
-    Serial.print(elapsed);
-    Serial.println("ms");
+//     Serial.println("sensor");
+//     Serial.println(i + 1);
+//if(dist <= 100) {
+     Serial.println(dist);
+     Serial.println("cm");
+//}
+//     Serial.print("cm  delay:");
+//     Serial.print(elapsed);
+//     Serial.println("ms");
 
     unsigned long now = millis();
-    if (dist < THRESHOLD && !wasTriggered[i] && (now - lastTriggered[i] > COOLDOWN)) {
+    if (dist < THRESHOLD && (now - lastTriggered[i] > COOLDOWN) && !wasTriggered[i]) {
+      Serial.print("NOTE:");
       Serial.println(notes[i]);
       wasTriggered[i] = true;
       lastTriggered[i] = now;
-    } else if (dist >= THRESHOLD) {
+    }
+
+     if (dist > 70 && dist < 900) {
       wasTriggered[i] = false;
     }
   }
