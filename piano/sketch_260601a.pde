@@ -1,29 +1,62 @@
-import processing.serial.*;
-import processing.sound.*;
+#define NUM_SENSORS 3
+#define THRESHOLD 70
+#define COOLDOWN 200
 
-Serial myPort;
-String[] noteNames = {"C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"};
-String[] fileNames  = {"C4.mp3", "D4.mp3", "E4.mp3", "F4.mp3", "G4.mp3", "A4.mp3", "B4.mp3", "C5.mp3"};
-SoundFile[] notes = new SoundFile[8];
+const int trigPins[NUM_SENSORS] = {3,7,11};
+const int echoPins[NUM_SENSORS] = {2,6,10};
+const String notes[NUM_SENSORS] = {"C4", "D4", "E4"};
+
+bool wasTriggered[NUM_SENSORS] = {false, false, false};
+unsigned long lastTriggered[NUM_SENSORS] = {0, 0, 0};
 
 void setup() {
-  size(300, 200);
-  myPort = new Serial(this, "COM5", 115200);
-  myPort.bufferUntil('\n');
-  for (int i = 0; i < 8; i++) {
-    notes[i] = new SoundFile(this, fileNames[i]);
+  Serial.begin(2000000);
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    pinMode(trigPins[i], OUTPUT);
+    pinMode(echoPins[i], INPUT);
   }
 }
 
-void draw() {}
+double getDistance(int i) {
+  digitalWrite(trigPins[i], LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPins[i], HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPins[i], LOW);
+  long d = pulseIn(echoPins[i], HIGH, 30000);
+  if (d == 0) return 999;
+  return (d / 2.0) * 340.0 * 100.0 / 1000000.0;
+}
 
-void serialEvent(Serial p) {
-  String msg = trim(p.readStringUntil('\n'));
-  if (msg == null) return;
+void loop() {
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    unsigned long start = millis();
+    double dist = getDistance(i);
+    // double dist = getDistance(0);
+    unsigned long elapsed = millis() - start;
 
-  for (int i = 0; i < noteNames.length; i++) {
-    if (msg.equals(noteNames[i])) {
-      notes[i].jump(0);
+    // 距離と遅延時間をシリアルモニターに表示
+//     Serial.println("sensor");
+//     Serial.println(i + 1);
+//if(dist <= 100) {
+     Serial.println(dist);
+     Serial.println("cm");
+//}
+//     Serial.print("cm  delay:");
+//     Serial.print(elapsed);
+//     Serial.println("ms");
+
+    unsigned long now = millis();
+    if (dist < THRESHOLD && (now - lastTriggered[i] > COOLDOWN) && !wasTriggered[i]) {
+      Serial.print("NOTE:");
+      Serial.println(notes[i]);
+      wasTriggered[i] = true;
+      lastTriggered[i] = now;
+    }
+
+     if (dist > 70 && dist < 900) {
+      wasTriggered[i] = false;
     }
   }
+  delay(1);
 }
