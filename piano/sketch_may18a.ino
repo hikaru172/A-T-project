@@ -1,6 +1,6 @@
 #define NUM_SENSORS 3
-#define THRESHOLD 70
-#define COOLDOWN 200
+#define THRESHOLD 50
+#define COOLDOWN 2000
 
 const int trigPins[NUM_SENSORS] = {3,7,11};
 const int echoPins[NUM_SENSORS] = {2,6,10};
@@ -54,7 +54,7 @@ void loop() {
       lastTriggered[i] = now;
     }
 
-     if (dist > 70 && dist < 900) {
+     if (dist > 70 && dist < 300) {
       wasTriggered[i] = false;
     }
   }
