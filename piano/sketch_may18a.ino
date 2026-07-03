@@ -1,28 +1,28 @@
-#define NUM_SENSORS 3
+#define NUM_SENSORS 8
 #define THRESHOLD 50
 #define COOLDOWN 200
 
-const int trigPins[NUM_SENSORS] = {3,7,A4};
-const int echoPins[NUM_SENSORS] = {2,6,A2};
-const String notes[NUM_SENSORS] = {"C4", "D4", "E4"};
+//const int trigPins[NUM_SENSORS] = {3,7,A4};
+//const int echoPins[NUM_SENSORS] = {2,6,A2};
+//const String notes[NUM_SENSORS] = {"C4", "D4", "E4"};
 
-bool wasTriggered[NUM_SENSORS] = {false, false, false};
-unsigned long lastTriggered[NUM_SENSORS] = {0, 0, 0};
-double dist[NUM_SENSORS] = {0, 0, 0};
-double lastdist[NUM_SENSORS] = {0, 0, 0};
-double lastdist2[NUM_SENSORS] = {0, 0, 0};
-double lastdist3[NUM_SENSORS] = {0, 0, 0};
+//bool wasTriggered[NUM_SENSORS] = {false, false, false};
+//unsigned long lastTriggered[NUM_SENSORS] = {0, 0, 0};
+//double dist[NUM_SENSORS] = {0, 0, 0};
+//double lastdist[NUM_SENSORS] = {0, 0, 0};
+//double lastdist2[NUM_SENSORS] = {0, 0, 0};
+//double lastdist3[NUM_SENSORS] = {0, 0, 0};
 
-//const int trigPins[NUM_SENSORS] = {3,5,7,9,11,13,A1,A3};
-//const int echoPins[NUM_SENSORS] = {2,4,6,8,10,12,A0,A2};
-//const String notes[NUM_SENSORS] = {"C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"};
+const int trigPins[NUM_SENSORS] = {13,11,9,7,5,3,A0,A2};
+const int echoPins[NUM_SENSORS] = {12,10,8,6,4,2,A1,A3};
+const String notes[NUM_SENSORS] = {"C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"};
 
-//bool wasTriggered[NUM_SENSORS] = {false, false, false, false, false, false, false, false};
-//unsigned long lastTriggered[NUM_SENSORS] = {0, 0, 0, 0, 0, 0, 0, 0};
-//double dist[NUM_SENSORS] = {0, 0, 0, 0, 0, 0, 0, 0};
-//double lastdist[NUM_SENSORS] = {0, 0, 0, 0, 0, 0, 0, 0};
-//double lastdist2[NUM_SENSORS] = {0, 0, 0, 0, 0, 0, 0, 0};
-//double lastdist3[NUM_SENSORS] = {0, 0, 0, 0, 0, 0, 0, 0};
+bool wasTriggered[NUM_SENSORS] = {false, false, false, false, false, false, false, false};
+unsigned long lastTriggered[NUM_SENSORS] = {0, 0, 0, 0, 0, 0, 0, 0};
+double dist[NUM_SENSORS] = {0, 0, 0, 0, 0, 0, 0, 0};
+double lastdist[NUM_SENSORS] = {0, 0, 0, 0, 0, 0, 0, 0};
+double lastdist2[NUM_SENSORS] = {0, 0, 0, 0, 0, 0, 0, 0};
+double lastdist3[NUM_SENSORS] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 void setup() {
   Serial.begin(1000000);
@@ -55,7 +55,7 @@ void loop() {
 //     Serial.println("sensor");
 //     Serial.println(i + 1);
 //if(dist <= 100) {
-     Serial.println(dist[2]);
+     Serial.println(dist[7]);
      Serial.println("cm");
 //}
 //     Serial.print("cm  delay:");
