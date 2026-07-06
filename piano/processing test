@@ -1,0 +1,181 @@
+import processing.serial.*;
+import processing.sound.*;
+
+Serial myPort;
+
+// 音名(内部処理用) と 表示用のドレミ表記
+String[] noteNames = {"C4","D4","E4", "F4", "G4", "A4", "B4", "C5"};
+String[] doremi    = {"ド","レ","ミ","ファ","ソ","ラ","シ","高ド"};
+String[] fileNames = {"C4.mp3", "D4.mp3", "E4.mp3", "F4.mp3", "G4.mp3", "A4.mp3", "B4.mp3", "C5.mp3"};
+SoundFile[] notes = new SoundFile[8];
+
+color[] noteColors = {
+  color(255, 90, 90),
+  color(255, 160, 80),
+  color(255, 220, 80),
+  color(150, 220, 90),
+  color(90, 200, 220),
+  color(110, 140, 240),
+  color(190, 120, 230),
+  color(240, 120, 190)
+};
+
+// ==========================
+// ゲーム状態
+// ==========================
+final int STATE_START = 0;
+final int STATE_PLAYING = 1;
+final int STATE_END = 2;
+int gameState = STATE_START;
+
+int timeLimit = 30;       // 制限時間(秒)
+int startMillis;
+int score = 0;
+int targetIndex = -1;     // 今割るべき風船の音
+
+int flashUntil = 0;
+color flashColor;
+PFont mainFont;
+
+void setup() {
+  size(600, 400);
+  myPort = new Serial(this, "COM6", 1000000);
+  myPort.bufferUntil('\n');
+  for (int i = 0; i < 8; i++) {
+    notes[i] = new SoundFile(this, fileNames[i]);
+  }
+  textAlign(CENTER, CENTER);
+  // 第3引数 true で日本語などの多バイト文字を含むアウトライン(スムーズ)フォントとして読み込む
+  mainFont = createFont("Meiryo", 32, true);   // Windows
+  // mainFont = createFont("Hiragino Sans", 32, true); // Mac
+  // mainFont = createFont("Noto Sans CJK JP", 32, true); // Linux
+  textFont(mainFont);
+}
+
+void draw() {
+  background(235, 245, 255);
+
+  if (gameState == STATE_START) {
+    drawStart();
+  } else if (gameState == STATE_PLAYING) {
+    drawGame();
+  } else {
+    drawEnd();
+  }
+}
+
+void mousePressed() {
+  if (gameState == STATE_START || gameState == STATE_END) {
+    startGame();
+  }
+}
+
+void startGame() {
+  gameState = STATE_PLAYING;
+  score = 0;
+  startMillis = millis();
+  pickNewTarget();
+}
+
+void pickNewTarget() {
+  int idx;
+  do {
+    idx = int(random(8));
+  } while (idx == targetIndex);
+  targetIndex = idx;
+}
+
+void drawStart() {
+  fill(40);
+  textSize(30);
+  text("風船割りピアノゲーム", width/2, height/2 - 50);
+  textSize(16);
+  text("表示された音をピアノで弾いて風船を割ろう", width/2, height/2 - 10);
+  text("クリックしてスタート", width/2, height/2 + 30);
+}
+
+void drawGame() {
+  int elapsed = (millis() - startMillis) / 1000;
+  int timeLeft = timeLimit - elapsed;
+  if (timeLeft <= 0) {
+    gameState = STATE_END;
+    return;
+  }
+
+  // 上部情報
+  fill(40);
+  textSize(18);
+  textAlign(LEFT, TOP);
+  text("残り時間: " + timeLeft + "秒", 20, 20);
+  text("スコア: " + score, 20, 45);
+
+  // 風船本体
+  textAlign(CENTER, CENTER);
+  float cx = width/2;
+  float cy = height/2 + 20;
+  float r = 140;
+
+  fill(noteColors[targetIndex]);
+  noStroke();
+  ellipse(cx, cy, r, r * 1.15);
+  // 風船の紐
+  stroke(150);
+  line(cx, cy + r*0.55, cx, cy + r*0.55 + 40);
+  noStroke();
+
+  fill(255);
+  textSize(48);
+  text(doremi[targetIndex], cx, cy);
+
+  // 正解フラッシュ
+  if (millis() < flashUntil) {
+    fill(red(flashColor), green(flashColor), blue(flashColor), 80);
+    rect(0, 0, width, height);
+  }
+}
+
+void drawEnd() {
+  fill(40);
+  textSize(30);
+  text("結果発表", width/2, height/2 - 50);
+  textSize(22);
+  text("スコア: " + score, width/2, height/2);
+  textSize(16);
+  text("クリックしてもう一度", width/2, height/2 + 50);
+}
+
+// ==========================
+// シリアル受信 (ピアノ入力)
+// ==========================
+void serialEvent(Serial p) {
+  String msg = trim(p.readStringUntil('\n'));
+  if (msg == null) return;
+  println(msg);
+
+  if (!msg.startsWith("NOTE:")) return;
+  msg = msg.substring(5);
+
+  int idx = -1;
+  for (int i = 0; i < noteNames.length; i++) {
+    if (msg.equals(noteNames[i])) {
+      idx = i;
+      break;
+    }
+  }
+  if (idx == -1) return;
+
+  notes[idx].stop();
+  notes[idx].play();
+
+  if (gameState != STATE_PLAYING) return;
+
+  if (idx == targetIndex) {
+    score++;
+    flashColor = color(120, 255, 120);
+    flashUntil = millis() + 100;
+    pickNewTarget();
+  } else {
+    flashColor = color(255, 120, 120);
+    flashUntil = millis() + 100;
+  }
+}
