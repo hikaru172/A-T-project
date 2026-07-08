@@ -9,6 +9,9 @@ String[] doremi    = {"ド","レ","ミ","ファ","ソ","ラ","シ","高ド"};
 String[] fileNames = {"C4.mp3", "D4.mp3", "E4.mp3", "F4.mp3", "G4.mp3", "A4.mp3", "B4.mp3", "C5.mp3"};
 SoundFile[] notes = new SoundFile[8];
 
+// --- 追加: 風船が割れたときの効果音用変数 ---
+SoundFile popSound; 
+
 color[] noteColors = {
   color(255, 90, 90),
   color(255, 160, 80),
@@ -33,6 +36,11 @@ int startMillis;
 int score = 0;
 int targetIndex = -1;     // 今割るべき風船の音
 
+// 風船の物理挙動用の変数
+float balloonX, balloonY;   // 風船の位置
+float balloonVX, balloonVY; // 風船の移動速度
+float balloonR = 140;       // 風船のサイズ（直径）
+
 int flashUntil = 0;
 color flashColor;
 PFont mainFont;
@@ -41,14 +49,18 @@ void setup() {
   size(600, 400);
   myPort = new Serial(this, "COM6", 1000000);
   myPort.bufferUntil('\n');
+  
+  // ピアノの音ファイルを読み込み
   for (int i = 0; i < 8; i++) {
     notes[i] = new SoundFile(this, fileNames[i]);
   }
+  
+  // --- 追加: 割れたときの効果音ファイルを読み込み ---
+  // ※ dataフォルダ内に "pop.mp3" を入れておいてください
+  popSound = new SoundFile(this, "pop.mp3"); 
+  
   textAlign(CENTER, CENTER);
-  // 第3引数 true で日本語などの多バイト文字を含むアウトライン(スムーズ)フォントとして読み込む
   mainFont = createFont("Meiryo", 32, true);   // Windows
-  // mainFont = createFont("Hiragino Sans", 32, true); // Mac
-  // mainFont = createFont("Noto Sans CJK JP", 32, true); // Linux
   textFont(mainFont);
 }
 
@@ -83,6 +95,15 @@ void pickNewTarget() {
     idx = int(random(8));
   } while (idx == targetIndex);
   targetIndex = idx;
+  
+  balloonX = random(balloonR, width - balloonR);
+  balloonY = random(balloonR, height - balloonR);
+  
+  balloonVX = random(-2.0, 2.0);
+  balloonVY = random(-2.0, 2.0);
+  
+  if (abs(balloonVX) < 0.5) balloonVX = (balloonVX < 0) ? -1.0 : 1.0;
+  if (abs(balloonVY) < 0.5) balloonVY = (balloonVY < 0) ? -1.0 : 1.0;
 }
 
 void drawStart() {
@@ -109,23 +130,33 @@ void drawGame() {
   text("残り時間: " + timeLeft + "秒", 20, 20);
   text("スコア: " + score, 20, 45);
 
-  // 風船本体
-  textAlign(CENTER, CENTER);
-  float cx = width/2;
-  float cy = height/2 + 20;
-  float r = 140;
+  // 風船の座標更新と壁での跳ね返り処理
+  balloonX += balloonVX;
+  balloonY += balloonVY;
 
+  if (balloonX - balloonR/2 < 0 || balloonX + balloonR/2 > width) {
+    balloonVX *= -1;
+  }
+  if (balloonY - (balloonR * 1.15)/2 < 60 || balloonY + (balloonR * 1.15)/2 > height) {
+    balloonVY *= -1;
+  }
+
+  textAlign(CENTER, CENTER);
+  
+  // 風船本体
   fill(noteColors[targetIndex]);
   noStroke();
-  ellipse(cx, cy, r, r * 1.15);
+  ellipse(balloonX, balloonY, balloonR, balloonR * 1.15);
+  
   // 風船の紐
   stroke(150);
-  line(cx, cy + r*0.55, cx, cy + r*0.55 + 40);
+  line(balloonX, balloonY + balloonR*0.55, balloonX, balloonY + balloonR*0.55 + 40);
   noStroke();
 
+  // ドレミの文字
   fill(255);
   textSize(48);
-  text(doremi[targetIndex], cx, cy);
+  text(doremi[targetIndex], balloonX, balloonY);
 
   // 正解フラッシュ
   if (millis() < flashUntil) {
@@ -171,6 +202,11 @@ void serialEvent(Serial p) {
 
   if (idx == targetIndex) {
     score++;
+    
+    // --- 追加: 正解した瞬間に割れる音を鳴らす ---
+    popSound.stop();
+    popSound.play();
+    
     flashColor = color(120, 255, 120);
     flashUntil = millis() + 100;
     pickNewTarget();
