@@ -2,39 +2,284 @@ import processing.serial.*;
 import processing.sound.*;
 
 Serial myPort;
-//String[] noteNames = {"C4", "D4", "E4"};
-//String[] fileNames  = {"C4.mp3", "D4.mp3", "E4.mp3"};
-//SoundFile[] notes = new SoundFile[3];
 
+// 音名(内部処理用) と 表示用のドレミ表記
 String[] noteNames = {"C4","D4","E4", "F4", "G4", "A4", "B4", "C5"};
-String[] fileNames  = {"C4.mp3", "D4.mp3", "E4.mp3", "F4.mp3", "G4.mp3", "A4.mp3", "B4.mp3", "C5.mp3"};
+String[] doremi    = {"ド","レ","ミ","ファ","ソ","ラ","シ","高ド"};
+String[] fileNames = {"C4.mp3", "D4.mp3", "E4.mp3", "F4.mp3", "G4.mp3", "A4.mp3", "B4.mp3", "C5.mp3"};
 SoundFile[] notes = new SoundFile[8];
 
+SoundFile popSound; 
+
+color[] noteColors = {
+  color(255, 90, 90),   // ド
+  color(255, 160, 80),  // レ
+  color(255, 220, 80),  // ミ
+  color(150, 220, 90),  // ファ
+  color(90, 200, 220),  // ソ
+  color(110, 140, 240), // ラ
+  color(190, 120, 230), // シ
+  color(240, 120, 190)  // 高ド
+};
+
+// ==========================
+// ゲーム状態
+// ==========================
+final int STATE_START = 0;
+final int STATE_PLAYING = 1;
+final int STATE_END = 2;
+int gameState = STATE_START;
+
+int timeLimit = 30;       // 制限時間(秒)
+int startMillis;
+int score = 0;
+
+// 風船の管理変数
+int maxBalloons = 3; 
+int[] targetIndices = new int[maxBalloons];
+float[] balloonX = new float[maxBalloons];
+float[] balloonY = new float[maxBalloons];
+float[] balloonVX = new float[maxBalloons];
+float[] balloonVY = new float[maxBalloons];
+boolean[] balloonActive = new boolean[maxBalloons];
+float balloonR = 140; // 画面が大きくなるので風船サイズを少し大きめ（140）に調整
+
+int flashUntil = 0;
+color flashColor;
+PFont mainFont;
+
 void setup() {
-  size(300, 200);
+  // --- 変更: size() から fullScreen() に変更して全画面化 ---
+  fullScreen(); 
+  
   myPort = new Serial(this, "COM6", 1000000);
   myPort.bufferUntil('\n');
+  
   for (int i = 0; i < 8; i++) {
     notes[i] = new SoundFile(this, fileNames[i]);
   }
+  popSound = new SoundFile(this, "pop.mp3"); 
+  
+  textAlign(CENTER, CENTER);
+  // 全画面に合わせてフォントサイズを少し大きく（40）変更
+  mainFont = createFont("Meiryo", 40, true); 
+  textFont(mainFont);
 }
 
-void draw() {}
+void draw() {
+  background(235, 245, 255);
 
+  if (gameState == STATE_START) {
+    drawStart();
+  } else if (gameState == STATE_PLAYING) {
+    drawGame();
+  } else {
+    drawEnd();
+  }
+}
+
+void mousePressed() {
+  if (gameState == STATE_START || gameState == STATE_END) {
+    startGame();
+  }
+}
+
+void startGame() {
+  gameState = STATE_PLAYING;
+  score = 0;
+  startMillis = millis();
+  spawnBalloonWave();
+}
+
+void spawnBalloonWave() {
+  int countToSpawn = int(random(1, 4)); 
+  for (int i = 0; i < maxBalloons; i++) {
+    if (i < countToSpawn) {
+      balloonActive[i] = true;
+      initBalloon(i); 
+    } else {
+      balloonActive[i] = false;
+    }
+  }
+}
+
+void initBalloon(int i) {
+  targetIndices[i] = int(random(8));
+  // 全画面の大きさに合わせて出現範囲を自動調整
+  balloonX[i] = random(balloonR, width - balloonR);
+  balloonY[i] = random(balloonR + 100, height - balloonR);
+  
+  // 画面が広くなった分、移動速度を少し速めに調整（-4.0 〜 4.0）
+  balloonVX[i] = random(-4.0, 4.0);
+  balloonVY[i] = random(-4.0, 4.0);
+  
+  if (abs(balloonVX[i]) < 1.0) balloonVX[i] = (balloonVX[i] < 0) ? -2.0 : 2.0;
+  if (abs(balloonVY[i]) < 1.0) balloonVY[i] = (balloonVY[i] < 0) ? -2.0 : 2.0;
+}
+
+void drawStart() {
+  fill(40);
+  textSize(48); // 文字サイズを全画面用に拡大
+  text("風船割りピアノゲーム", width/2, height/2 - 60);
+  textSize(24);
+  text("表示された音をピアノで弾いて風船を割ろう", width/2, height/2 + 10);
+  text("クリックしてスタート", width/2, height/2 + 70);
+}
+
+void drawGame() {
+  int elapsed = (millis() - startMillis) / 1000;
+  int timeLeft = timeLimit - elapsed;
+  if (timeLeft <= 0) {
+    gameState = STATE_END;
+    return;
+  }
+
+  // 上部情報
+  fill(40);
+  textSize(26); // 文字サイズを全画面用に拡大
+  textAlign(LEFT, TOP);
+  text("残り時間: " + timeLeft + "秒", 40, 30);
+  text("スコア: " + score, 40, 70);
+
+  // 風船の更新と描画ループ
+  for (int i = 0; i < maxBalloons; i++) {
+    if (!balloonActive[i]) continue;
+
+    // 座標の更新
+    balloonX[i] += balloonVX[i];
+    balloonY[i] += balloonVY[i];
+
+    // 壁での跳ね返り（width, height を使うので全画面でも正確に跳ね返ります）
+    if (balloonX[i] - balloonR/2 < 0 || balloonX[i] + balloonR/2 > width) {
+      balloonVX[i] *= -1;
+    }
+    // 上部の文字表示エリアに被りすぎないよう上端の判定を120に調整
+    if (balloonY[i] - (balloonR * 1.15)/2 < 120 || balloonY[i] + (balloonR * 1.15)/2 > height) {
+      balloonVY[i] *= -1;
+    }
+
+    // 風船のグラフィック描画
+    pushMatrix();
+    translate(balloonX[i], balloonY[i]);
+    
+    float bW = balloonR;
+    float bH = balloonR * 1.15;
+    int tIdx = targetIndices[i];
+
+    noStroke();
+    color baseColor = noteColors[tIdx];
+    for (int j = 0; j < 25; j++) {
+      float percent = map(j, 0, 25, 0, 1);
+      color c = lerpColor(baseColor, color(red(baseColor)*0.4, green(baseColor)*0.4, blue(baseColor)*0.4), percent);
+      fill(c, map(j, 0, 25, 255, 20));
+      ellipse(0, 0, bW * (1.0 + percent*0.04), bH * (1.0 + percent*0.04));
+    }
+    fill(baseColor);
+    ellipse(0, 0, bW, bH);
+
+    // 結び目
+    float knotW = 20;
+    float knotH = 15;
+    ellipse(0, bH/2 + knotH/2 - 2, knotW, knotH);
+
+    // ハイライト
+    fill(255, 160);
+    ellipse(-bW*0.25, -bH*0.2, bW*0.28, bH*0.28);
+
+    // ドレミの文字 (黄色の風船でも見えやすいようにフチ取りを強化)
+    textAlign(CENTER, CENTER);
+    textSize(46); 
+    
+    // 4方向の黒い影でフチを作る
+    fill(0, 150); 
+    text(doremi[tIdx], -2, -2);
+    text(doremi[tIdx], 2, -2);
+    text(doremi[tIdx], -2, 2);
+    text(doremi[tIdx], 2, 2);
+    
+    // メインの白文字
+    fill(255);
+    text(doremi[tIdx], 0, 0);
+
+    popMatrix();
+
+    // 紐の描画
+    stroke(150);
+    strokeWeight(2);
+    line(balloonX[i], balloonY[i] + bH/2 + knotH - 2, balloonX[i], balloonY[i] + bH/2 + knotH + 45);
+    noStroke();
+  }
+
+  // 正解・不正解フラッシュ（復活）
+  if (millis() < flashUntil) {
+    fill(red(flashColor), green(flashColor), blue(flashColor), 80);
+    rect(0, 0, width, height);
+  }
+}
+
+void drawEnd() {
+  fill(40);
+  textSize(48);
+  text("結果発表", width/2, height/2 - 60);
+  textSize(32);
+  text("スコア: " + score, width/2, height/2 + 10);
+  textSize(24);
+  text("クリックしてもう一度", width/2, height/2 + 80);
+}
+
+// ==========================
+// シリアル受信 (ピアノ入力)
+// ==========================
 void serialEvent(Serial p) {
   String msg = trim(p.readStringUntil('\n'));
-  println(msg);
-  
   if (msg == null) return;
+  println(msg);
 
   if (!msg.startsWith("NOTE:")) return;
+  msg = msg.substring(5);
 
-  msg = msg.substring(5); // "NOTE:"を削除
-
+  int idx = -1;
   for (int i = 0; i < noteNames.length; i++) {
     if (msg.equals(noteNames[i])) {
-      notes[i].stop();
-      notes[i].play();
+      idx = i;
+      break;
     }
+  }
+  if (idx == -1) return;
+
+  notes[idx].stop();
+  notes[idx].play();
+
+  if (gameState != STATE_PLAYING) return;
+
+  boolean hit = false;
+  for (int i = 0; i < maxBalloons; i++) {
+    if (balloonActive[i] && idx == targetIndices[i]) {
+      score++;
+      popSound.stop();
+      popSound.play();
+      balloonActive[i] = false; 
+      hit = true;
+      break; 
+    }
+  }
+
+  if (hit) {
+    flashColor = color(120, 255, 120); // 正解：緑フラッシュ
+    flashUntil = millis() + 100;
+    
+    boolean anyLeft = false;
+    for (int i = 0; i < maxBalloons; i++) {
+      if (balloonActive[i]) {
+        anyLeft = true;
+        break;
+      }
+    }
+    if (!anyLeft) {
+      spawnBalloonWave();
+    }
+  } else {
+    flashColor = color(255, 120, 120); // 不正解：赤フラッシュ
+    flashUntil = millis() + 100;
   }
 }
