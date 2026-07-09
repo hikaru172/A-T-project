@@ -186,11 +186,18 @@ void drawGame() {
     fill(255, 160);
     ellipse(-bW*0.25, -bH*0.2, bW*0.28, bH*0.28);
 
-    // ドレミの文字
+    // ドレミの文字 (黄色の風船でも見えやすいようにフチ取りを強化)
     textAlign(CENTER, CENTER);
-    textSize(46); // 文字のサイズを調整
-    fill(0, 60);
+    textSize(46); 
+    
+    // 4方向の黒い影でフチを作る
+    fill(0, 150); 
+    text(doremi[tIdx], -2, -2);
+    text(doremi[tIdx], 2, -2);
+    text(doremi[tIdx], -2, 2);
     text(doremi[tIdx], 2, 2);
+    
+    // メインの白文字
     fill(255);
     text(doremi[tIdx], 0, 0);
 
@@ -203,7 +210,7 @@ void drawGame() {
     noStroke();
   }
 
-  // 正解フラッシュ
+  // 正解・不正解フラッシュ（復活）
   if (millis() < flashUntil) {
     fill(red(flashColor), green(flashColor), blue(flashColor), 80);
     rect(0, 0, width, height);
@@ -258,7 +265,7 @@ void serialEvent(Serial p) {
   }
 
   if (hit) {
-    flashColor = color(120, 255, 120);
+    flashColor = color(120, 255, 120); // 正解：緑フラッシュ
     flashUntil = millis() + 100;
     
     boolean anyLeft = false;
@@ -272,7 +279,7 @@ void serialEvent(Serial p) {
       spawnBalloonWave();
     }
   } else {
-    flashColor = color(255, 120, 120);
+    flashColor = color(255, 120, 120); // 不正解：赤フラッシュ
     flashUntil = millis() + 100;
   }
 }
