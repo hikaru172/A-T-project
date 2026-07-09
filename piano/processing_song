@@ -1,0 +1,339 @@
+import processing.serial.*;
+import processing.sound.*;
+
+Serial myPort;
+
+// 音名(内部処理用) と 表示用のドレミ表記
+String[] noteNames = {"C4","D4","E4", "F4", "G4", "A4", "B4", "C5"};
+String[] doremi    = {"ド","レ","ミ","ファ","ソ","ラ","シ","高ド"};
+String[] fileNames = {"C4.mp3", "D4.mp3", "E4.mp3", "F4.mp3", "G4.mp3", "A4.mp3", "B4.mp3", "C5.mp3"};
+SoundFile[] notes = new SoundFile[8];
+
+color[] noteColors = {
+  color(255, 90, 90),   // ド
+  color(255, 160, 80),  // レ
+  color(255, 220, 80),  // ミ
+  color(150, 220, 90),  // ファ
+  color(90, 200, 220),  // ソ
+  color(110, 140, 240), // ラ
+  color(190, 120, 230), // シ
+  color(240, 120, 190)  // 高ド
+};
+
+// ==========================
+// 楽曲管理システム
+// ==========================
+class Song {
+  String title;
+  int[] notes;
+  
+  Song(String title, int[] notes) {
+    this.title = title;
+    this.notes = notes;
+  }
+}
+
+Song[] playlist;
+int selectedSongIndex = 0; 
+
+// ==========================
+// ゲーム状態
+// ==========================
+final int STATE_START = 0;
+final int STATE_PLAYING = 1;
+final int STATE_END = 2;
+int gameState = STATE_START;
+
+int currentNoteIndex = 0; 
+
+// ノーツ（音符）の管理
+float noteSize = 150; 
+float[] balloonX; 
+
+int flashUntil = 0;
+color flashColor;
+PFont mainFont;
+
+void setup() {
+  fullScreen(); 
+  
+  // シリアルポートの設定
+  myPort = new Serial(this, "COM6", 1000000);
+  myPort.bufferUntil('\n');
+  
+  for (int i = 0; i < 8; i++) {
+    notes[i] = new SoundFile(this, fileNames[i]);
+  }
+  
+  // --------------------------
+  // 楽曲データの登録
+  // --------------------------
+  playlist = new Song[8];
+  
+  playlist[0] = new Song("きらきら星", new int[]{
+    0, 0, 4, 4, 5, 5, 4, 3, 3, 2, 2, 1, 1, 0,
+    4, 4, 3, 3, 2, 2, 1, 4, 4, 3, 3, 2, 2, 1,
+    0, 0, 4, 4, 5, 5, 4, 3, 3, 2, 2, 1, 1, 0
+  });
+  
+  playlist[1] = new Song("かえるの合唱", new int[]{
+    0, 1, 2, 3, 2, 1, 0, 2, 3, 4, 5, 4, 3, 2,
+    0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 2, 1, 0
+  });
+  
+  playlist[2] = new Song("ぶんぶんぶん", new int[]{
+    4, 3, 2, 4, 3, 2, 0, 1, 2, 3, 4, 4, 4,
+    4, 3, 2, 4, 3, 2, 0, 2, 4, 4, 0
+  });
+
+  playlist[3] = new Song("メリーさんのひつじ", new int[]{
+    2, 1, 0, 1, 2, 2, 2, 1, 1, 1, 2, 4, 4,
+    2, 1, 0, 1, 2, 2, 2, 2, 1, 1, 2, 1, 0
+  });
+
+  playlist[4] = new Song("大きな古時計", new int[]{
+    0, 2, 3, 4, 7, 6, 5, 4, 5, 6, 5, 4, 2, 3, 2, 1,
+    0, 2, 3, 4, 7, 6, 5, 4, 5, 3, 2, 1, 0
+  });
+
+  playlist[5] = new Song("チューリップ", new int[]{
+    0, 1, 2, 0, 1, 2, 4, 2, 1, 0, 1, 2, 1,
+    0, 1, 2, 0, 1, 2, 4, 2, 1, 0, 1, 2, 0,
+    4, 4, 2, 2, 1, 1, 4, 4, 4, 2, 2, 1, 1, 0
+  });
+
+  playlist[6] = new Song("ロンドン橋", new int[]{
+    4, 5, 4, 3, 2, 3, 4, 1, 2, 3, 2, 3, 4,
+    4, 5, 4, 3, 2, 3, 4, 1, 4, 2, 0
+  });
+
+  playlist[7] = new Song("聖者の行進", new int[]{
+    0, 2, 3, 4, 0, 2, 3, 4, 0, 2, 3, 4, 2, 0, 2, 1,
+    2, 2, 1, 0, 0, 2, 4, 4, 4, 3, 2, 3, 4, 2, 0, 1, 0
+  });
+  
+  textAlign(CENTER, CENTER);
+  mainFont = createFont("Meiryo-Bold", 40, true); 
+  textFont(mainFont);
+  
+  balloonX = new float[8];
+  for (int i = 0; i < 8; i++) {
+    balloonX[i] = map(i, 0, 7, width * 0.15, width * 0.85);
+  }
+}
+
+void draw() {
+  background(235, 245, 255);
+
+  if (gameState == STATE_START) {
+    drawStart();
+  } else if (gameState == STATE_PLAYING) {
+    drawGame();
+  } else {
+    drawEnd();
+  }
+}
+
+void keyPressed() {
+  if (gameState == STATE_START || gameState == STATE_END) {
+    if (keyCode == RIGHT) {
+      selectedSongIndex = (selectedSongIndex + 1) % playlist.length;
+    } else if (keyCode == LEFT) {
+      selectedSongIndex = (selectedSongIndex - 1 + playlist.length) % playlist.length;
+    }
+  }
+}
+
+void mousePressed() {
+  if (gameState == STATE_START || gameState == STATE_END) {
+    startGame();
+  }
+}
+
+void startGame() {
+  gameState = STATE_PLAYING;
+  currentNoteIndex = 0;
+}
+
+void drawStart() {
+  Song currentSong = playlist[selectedSongIndex];
+  
+  fill(40);
+  textSize(48);
+  text("ピアノ演奏ゲーム", width/2, height/2 - 100);
+  
+  stroke(100);
+  strokeWeight(2);
+  fill(255);
+  rect(width/2 - 250, height/2 - 30, 500, 60, 10);
+  
+  fill(40);
+  textSize(28);
+  text("＜  " + currentSong.title + "  ＞", width/2, height/2);
+  
+  textSize(20);
+  fill(100);
+  text("※ 左右の矢印キー(← →)で曲を選べます", width/2, height/2 + 50);
+  
+  fill(40);
+  textSize(24);
+  text("流れてくる音符の通りにピアノを弾こう！", width/2, height/2 + 110);
+  text("画面クリックして演奏スタート", width/2, height/2 + 160);
+}
+
+void drawGame() {
+  Song currentSong = playlist[selectedSongIndex];
+
+  // ガイドライン
+  for (int i = 0; i < 8; i++) {
+    stroke(200);
+    strokeWeight(2);
+    line(balloonX[i], 0, balloonX[i], height);
+    
+    fill(noteColors[i], 100);
+    noStroke();
+    ellipse(balloonX[i], height - 80, 60, 60);
+    fill(40);
+    textSize(20);
+    text(doremi[i], balloonX[i], height - 80);
+  }
+
+  // 上部情報
+  fill(40);
+  textSize(26);
+  textAlign(LEFT, TOP);
+  text("曲名: " + currentSong.title, 40, 30);
+  text("進行度: " + currentNoteIndex + " / " + currentSong.notes.length, 40, 70);
+  textAlign(CENTER, CENTER); 
+
+  // 楽譜（音符）の描画
+  for (int i = currentNoteIndex; i < min(currentNoteIndex + 4, currentSong.notes.length); i++) {
+    int noteTarget = currentSong.notes[i];
+    float x = balloonX[noteTarget];
+    
+    float y = (height - 250) - (i - currentNoteIndex) * 220; 
+    float currentS = (i == currentNoteIndex) ? noteSize * 1.2 : noteSize * 0.9;
+
+    if (y > -100) { 
+      drawNote(x, y, currentS, noteTarget);
+    }
+  }
+
+  // フラッシュ効果
+  if (millis() < flashUntil) {
+    fill(red(flashColor), green(flashColor), blue(flashColor), 80);
+    rect(0, 0, width, height);
+  }
+}
+
+// 音符（4分音符）のグラフィック描画関数
+void drawNote(float x, float y, float size, int tIdx) {
+  pushMatrix();
+  translate(x, y);
+  
+  color baseColor = noteColors[tIdx];
+  float headW = size * 0.6;
+  float headH = size * 0.45;
+
+  // 1. ぼう（符幹）
+  stroke(baseColor);
+  strokeWeight(size * 0.08);
+  strokeCap(ROUND);
+  line(headW * 0.4, 0, headW * 0.4, -size * 0.9);
+  
+  // 2. たま（符頭）
+  pushMatrix();
+  rotate(radians(-20)); 
+  
+  noStroke();
+  fill(baseColor);
+  ellipse(0, 0, headW, headH);
+  
+  // グラデーション効果
+  for (int j = 0; j < 15; j++) {
+    float percent = map(j, 0, 15, 0, 1);
+    color c = lerpColor(baseColor, color(0), percent * 0.3); 
+    fill(c, map(j, 0, 15, 200, 0));
+    ellipse(0, 0, headW * (1.0 - percent * 0.1), headH * (1.0 - percent * 0.1));
+  }
+  
+  fill(255, 100); 
+  ellipse(-headW * 0.2, -headH * 0.2, headW * 0.2, headH * 0.2);
+  popMatrix();
+
+  // 3. 音符マーク（ドレミ文字）
+  textSize(size * 0.35); 
+  
+  // 文字のフチ取り
+  fill(0, 180); 
+  float offset = 1.5; 
+  text(doremi[tIdx], -offset, -offset); text(doremi[tIdx], offset, -offset);
+  text(doremi[tIdx], -offset, offset);  text(doremi[tIdx], offset, offset);
+  
+  // メイン文字
+  fill(255);
+  text(doremi[tIdx], 0, -headH * 0.1); 
+  
+  popMatrix();
+}
+
+void drawEnd() {
+  fill(40);
+  textSize(48);
+  text("演奏終了！お疲れ様でした！", width/2, height/2 - 50); 
+  
+  textSize(20);
+  fill(100);
+  text("別の曲を選ぶ場合は 左右の矢印キー(← →)", width/2, height/2 + 30);
+  
+  fill(40);
+  textSize(24);
+  text("クリックしてもう一度演奏する", width/2, height/2 + 90);
+}
+
+// ==========================
+// シリアル受信 (ピアノ入力)
+// ==========================
+void serialEvent(Serial p) {
+  String msg = trim(p.readStringUntil('\n'));
+  if (msg == null) return;
+  println(msg);
+
+  if (!msg.startsWith("NOTE:")) return;
+  msg = msg.substring(5);
+
+  int idx = -1;
+  for (int i = 0; i < noteNames.length; i++) {
+    if (msg.equals(noteNames[i])) {
+      idx = i;
+      break;
+    }
+  }
+  if (idx == -1) return;
+
+  // ★★★ 修正ポイント：押された鍵盤の音はいつでも必ず鳴るように配置を戻しました ★★★
+  notes[idx].stop();
+  notes[idx].play();
+
+  // ゲーム中でなければ（メニュー画面などなら）ここで処理終了
+  if (gameState != STATE_PLAYING) return;
+
+  Song currentSong = playlist[selectedSongIndex];
+  int targetIdx = currentSong.notes[currentNoteIndex];
+
+  if (idx == targetIdx) {
+    // 表示されている正しい音を押した場合
+    flashColor = color(120, 255, 120, 100); // 緑フラッシュ
+    flashUntil = millis() + 100;
+    
+    currentNoteIndex++;
+    
+    if (currentNoteIndex >= currentSong.notes.length) {
+      gameState = STATE_END;
+    }
+  } else {
+    // 表示されているものとは違う音を押した場合（音は鳴りつつ、赤フラッシュ）
+    flashColor = color(255, 120, 120, 100); // 赤フラッシュ
+    flashUntil = millis() + 100;
+  }
+}
